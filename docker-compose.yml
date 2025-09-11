@@ -38,7 +38,7 @@ services:
       - n8n-postgresql
       - n8n-redis
     ports:
-      - '${N8N_PORT:-8181}:${N8N_PORT:-8181}'
+      - '${N8N_PORT:-8282}:${N8N_PORT:-8282}'
       - '5678:5678'
     healthcheck:
       test:
@@ -94,7 +94,7 @@ services:
     networks:
       - default
     ports:
-      - '${WEBHOOK_PORT:-8282}:${WEBHOOK_PORT:-8282}'
+      - '${WEBHOOK_PORT:-8383}:${WEBHOOK_PORT:-8383}'
     env_file:
       - .env
     deploy:
@@ -140,7 +140,7 @@ services:
     networks:
       - default
     ports:
-      - '${WORKER_PORT:-8383}:${WORKER_PORT:-8383}'
+      - '${WORKER_PORT:-8484}:${WORKER_PORT:-8484}'
     deploy:
       resources:
         limits:
@@ -213,7 +213,7 @@ services:
     networks:
       - default
     ports:
-      - '${EVOLUTION_PORT:-8484}:8080'
+      - '${EVOLUTION_PORT:-8585}:8585'
     depends_on:
       - n8n-postgresql
       - n8n-redis
@@ -246,17 +246,17 @@ services:
           cpus: '1'
           memory: 1000M
 
-  coolify-app:
-    container_name: coolify-app
-    hostname: coolify-app
+  coolify-base:
+    container_name: coolify-base
+    hostname: coolify-base
     build:
-      context: ./coolify-app
+      context: ./coolify-base
       dockerfile: ./docker/development/Dockerfile
       args:
         - USER_ID=${USERID:-1000}
         - GROUP_ID=${GROUPID:-1000}
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - "${BASE_PORT:-8181}:8181"
     depends_on:
       - coolify-soketi
       - evolution-api
@@ -282,7 +282,7 @@ services:
       SERVICE_USER_POSTGRESQL: "${POSTGRES_USER:-postgres}"
       SERVICE_PASSWORD_POSTGRESQL: "${POSTGRES_PASSWORD:-password}"
     volumes:
-      - ./coolify-app:/var/www/html/:cached
+      - ./coolify-base:/var/www/html/:cached
       - coolify-backups-data:/var/www/html/storage/app/backups
     env_file:
       - .env
@@ -296,14 +296,14 @@ services:
     container_name: coolify-soketi
     hostname: coolify-soketi
     build:
-      context: ./coolify-app
+      context: ./coolify-base
       dockerfile: ./docker/coolify-realtime/Dockerfile
     ports:
       - "${FORWARD_SOKETI_PORT:-6001}:6001"
       - "6002:6002"
     volumes:
       - ./storage:/var/www/html/storage
-      - ./coolify-app/docker/coolify-realtime/terminal-server.js:/terminal/terminal-server.js
+      - ./coolify-base/docker/coolify-realtime/terminal-server.js:/terminal/terminal-server.js
     environment:
       SOKETI_DEBUG: "false"
       SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
@@ -320,35 +320,38 @@ services:
           cpus: '0.5'
           memory: 512M
 
-  # coolify-vite:
-  #   container_name: coolify-vite
-  #   hostname: coolify-vite
-  #   image: node:24-alpine
-  #   pull_policy: always
-  #   working_dir: /var/www/html
-  #   environment:
-  #     VITE_HOST: "${VITE_HOST:-localhost}"
-  #     VITE_PORT: "${VITE_PORT:-5173}"
-  #   ports:
-  #     - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
-  #   volumes:
-  #     - .:/var/www/html/:cached
-  #   command: sh -c "npm install && npm run dev"
-  #   networks:
-  #     - default
-  #   env_file:
-  #     - .env
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '1'
-  #         memory: 1000M
+  coolify-app:
+    container_name: coolify-app
+    hostname: coolify-app
+    image: node:24-alpine
+    pull_policy: always
+    working_dir: /var/www/html
+    environment:
+      VITE_HOST: "${VITE_HOST:-localhost}"
+      VITE_PORT: "${VITE_PORT:-5173}"
+    ports:
+      - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
+      - "${APP_PORT:-8080}:5173"
+    volumes:
+      - ./coolify-base:/var/www/html/:cached
+    command: sh -c "npm install && npm run dev"
+    depends_on:
+      - coolify-base
+    networks:
+      - default
+    env_file:
+      - .env
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1000M
 
   coolify-testing-host:
     container_name: coolify-testing-host
     hostname: coolify-testing-host
     build:
-      context: ./coolify-app
+      context: ./coolify-base
       dockerfile: ./docker/testing-host/Dockerfile
     init: true
     volumes:
@@ -361,7 +364,7 @@ services:
     networks:
       - default
     ports:
-      - '${TESTING_HOST_PORT:-8585}:8585'
+      - '${TESTING_HOST_PORT:-8686}:8686'
     env_file:
       - .env
     deploy:

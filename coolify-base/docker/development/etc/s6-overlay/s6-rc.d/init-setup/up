@@ -19,4 +19,14 @@ foreground {
     dev
     --init
 }
+foreground {
+    php
+    artisan
+    migrate:fresh
+}
+foreground {
+    php
+    artisan
+    db:seed
+}
 
