@@ -105,6 +105,8 @@ services:
     image: ankane/pgvector
     container_name: n8n-postgresql
     restart: always
+    ports:
+      - "${N8N_POSTGRES_EXTERNAL_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: ${N8N_POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${N8N_POSTGRES_PASSWORD}
