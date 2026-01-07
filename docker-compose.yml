@@ -10,7 +10,8 @@ include:
 ########################
 networks:
   internal:
-    driver: bridge
+    external: true
+    name: n8n_internal
 
 ########################
 # VOLUMES
@@ -67,7 +68,6 @@ x-n8n-common: &n8n_common
 # SERVICES
 ########################
 services:
-
   ########################
   # N8N
   ########################

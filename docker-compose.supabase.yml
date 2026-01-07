@@ -17,7 +17,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://studio:3000/api/platform/profile').then((r) => {if (r.status !== 200) throw new Error(r.status)})"
+          "fetch('http://studio:3000/api/platform/profile').then((r) => {if (r.status !== 200) throw new Error(r.status)})",
         ]
       timeout: 10s
       interval: 5s
@@ -31,12 +31,10 @@ services:
 
       STUDIO_PG_META_URL: http://meta:8080
 
-      DEFAULT_PROJECT_NAME: ${STUDIO_DEFAULT_PROJECT}
-
       SUPABASE_URL: http://kong:8000
 
       # LOGFLARE_API_KEY is deprecated
-      LOGFLARE_API_KEY: ${LOGFLARE_PUBLIC_ACCESS_TOKEN}
+      LOGFLARE_API_KEY: ${SUPABASE_LOGFLARE_PUBLIC_ACCESS_TOKEN}
 
       LOGFLARE_URL: http://analytics:4000
       NEXT_PUBLIC_ENABLE_LOGS: true
@@ -47,11 +45,11 @@ services:
 
       # Override para o projeto n8n
       POSTGRES_HOST: ${SUPABASE_POSTGRES_HOST:-db}
-      POSTGRES_PORT: SUPABASE_POSTGRES_PORT:-5432
+      POSTGRES_PORT: ${SUPABASE_POSTGRES_PORT:-5432}
       POSTGRES_DB: ${SUPABASE_POSTGRES_DB:-postgres}
       POSTGRES_PASSWORD: ${SUPABASE_POSTGRES_PASSWORD}
       PG_META_CRYPTO_KEY: ${SUPABASE_PG_META_CRYPTO_KEY}
-      DEFAULT_ORGANIZATION_NAME: ${SUPABASE_STUDIO_DEFAULT_ORGANIZATION:-Default Organization}
+      DEFAULT_ORGANIZATION_NAME: ${SUPABASE_STUDIO_DEFAULT_ORGANIZATION:-Studio}
       DEFAULT_PROJECT_NAME: ${SUPABASE_STUDIO_DEFAULT_PROJECT:-Default Project}
       SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8000}
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
@@ -68,8 +66,8 @@ services:
     image: kong:2.8.1
     restart: unless-stopped
     ports:
-      - ${KONG_HTTP_PORT}:8000/tcp
-      - ${KONG_HTTPS_PORT}:8443/tcp
+      - ${SUPABASE_KONG_HTTP_PORT:-8000}/tcp
+      - ${SUPABASE_KONG_HTTPS_PORT:-8443}/tcp
     volumes:
       # https://github.com/supabase/supabase/issues/12661
       - ./volumes/api/kong.yml:/home/kong/temp.yml:ro,z
@@ -84,7 +82,7 @@ services:
       KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth,request-termination,ip-restriction
       KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
       KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
-      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
 
       # Override para o projeto n8nSUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
@@ -108,7 +106,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:9999/health"
+          "http://localhost:9999/health",
         ]
       timeout: 5s
       interval: 5s
@@ -124,7 +122,7 @@ services:
       GOTRUE_API_PORT: 9999
 
       GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${SUPABASE_POSTGRES_PASSWORD}@${SUPABASE_POSTGRES_HOST}:${SUPABASE_POSTGRES_PORT}/${SUPABASE_POSTGRES_DB}
 
       GOTRUE_JWT_ADMIN_ROLES: service_role
       GOTRUE_JWT_AUD: authenticated
@@ -201,10 +199,7 @@ services:
       PGRST_APP_SETTINGS_JWT_SECRET: ${SUPABASE_JWT_SECRET}
       PGRST_APP_SETTINGS_JWT_EXP: ${SUPABASE_JWT_EXPIRY:-3600}
 
-    command:
-      [
-        "postgrest"
-      ]
+    command: ["postgrest"]
 
   realtime:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
@@ -222,14 +217,14 @@ services:
       test:
         [
           "CMD-SHELL",
-          "curl -sSfL --head -o /dev/null -H \"Authorization: Bearer ${ANON_KEY}\" http://localhost:4000/api/tenants/realtime-dev/health"
+          'curl -sSfL --head -o /dev/null -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" http://localhost:4000/api/tenants/realtime-dev/health',
         ]
       timeout: 5s
       interval: 5s
       retries: 3
     environment:
       PORT: 4000
-      DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
+      DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"
       DB_ENC_KEY: supabaserealtime
       ERL_AFLAGS: -proto_dist inet_tcp
       DNS_NODES: "''"
@@ -262,7 +257,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://storage:5000/status"
+          "http://storage:5000/status",
         ]
       timeout: 5s
       interval: 5s
@@ -294,7 +289,6 @@ services:
       PGRST_JWT_SECRET: ${SUPABASE_JWT_SECRET}
       DATABASE_URL: postgres://supabase_storage_admin:${SUPABASE_POSTGRES_PASSWORD}@${SUPABASE_POSTGRES_HOST:-db}:5432/${SUPABASE_POSTGRES_DB:-postgres}
 
-
   imgproxy:
     profiles: ["supabase"]
     container_name: supabase-imgproxy
@@ -303,12 +297,7 @@ services:
     volumes:
       - ./volumes/storage:/var/lib/storage:z
     healthcheck:
-      test:
-        [
-          "CMD",
-          "imgproxy",
-          "health"
-        ]
+      test: ["CMD", "imgproxy", "health"]
       timeout: 5s
       interval: 5s
       retries: 3
@@ -362,12 +351,7 @@ services:
       SUPABASE_DB_URL: postgresql://postgres:${SUPABASE_POSTGRES_PASSWORD}@${SUPABASE_POSTGRES_HOST:-db}:5432/${SUPABASE_POSTGRES_DB:-postgres}
       VERIFY_JWT: ${SUPABASE_FUNCTIONS_VERIFY_JWT:-false}
 
-    command:
-      [
-        "start",
-        "--main-service",
-        "/home/deno/functions/main"
-      ]
+    command: ["start", "--main-service", "/home/deno/functions/main"]
 
   analytics:
     profiles: ["supabase"]
@@ -383,12 +367,7 @@ services:
     #     target: /opt/app/rel/logflare/bin/gcloud.json
     #     read_only: true
     healthcheck:
-      test:
-        [
-          "CMD",
-          "curl",
-          "http://localhost:4000/health"
-        ]
+      test: ["CMD", "curl", "http://localhost:4000/health"]
       timeout: 5s
       interval: 5s
       retries: 10
@@ -411,7 +390,6 @@ services:
       LOGFLARE_PUBLIC_ACCESS_TOKEN: ${SUPABASE_LOGFLARE_PUBLIC_ACCESS_TOKEN}
       LOGFLARE_PRIVATE_ACCESS_TOKEN: ${SUPABASE_LOGFLARE_PRIVATE_ACCESS_TOKEN}
       POSTGRES_BACKEND_URL: postgresql://supabase_admin:${SUPABASE_POSTGRES_PASSWORD}@${SUPABASE_POSTGRES_HOST:-db}:5432/_supabase
-
 
   # Comment out everything below this point if you are using an external Postgres database
   db:
@@ -439,15 +417,7 @@ services:
       # Use named volume to persist pgsodium decryption key between restarts
       - db-config:/etc/postgresql-custom
     healthcheck:
-      test:
-        [
-        "CMD",
-        "pg_isready",
-        "-U",
-        "postgres",
-        "-h",
-        "localhost"
-        ]
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -459,8 +429,8 @@ services:
     environment:
       # Override para o projeto n8n
       POSTGRES_HOST: /var/run/postgresql
-      PGPORT: 5432
-      POSTGRES_PORT: 5432
+      PGPORT: ${SUPABASE_POSTGRES_PORT:-5432}
+      POSTGRES_PORT: ${SUPABASE_POSTGRES_PORT:-5432}
       PGPASSWORD: ${SUPABASE_POSTGRES_PASSWORD}
       POSTGRES_PASSWORD: ${SUPABASE_POSTGRES_PASSWORD}
       PGDATABASE: ${SUPABASE_POSTGRES_DB:-postgres}
@@ -468,13 +438,12 @@ services:
       JWT_SECRET: ${SUPABASE_JWT_SECRET}
       JWT_EXP: ${SUPABASE_JWT_EXPIRY:-3600}
 
-    command:
-      [
+    command: [
         "postgres",
         "-c",
         "config_file=/etc/postgresql/postgresql.conf",
         "-c",
-        "log_min_messages=fatal" # prevents Realtime polling queries from appearing in logs
+        "log_min_messages=fatal", # prevents Realtime polling queries from appearing in logs
       ]
 
   vector:
@@ -485,7 +454,7 @@ services:
     volumes:
       - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro,z
       - ${SUPABASE_DOCKER_SOCKET_LOCATION:-/var/run/docker.sock}:/var/run/docker.sock:ro,z
-    
+
     healthcheck:
       test:
         [
@@ -494,18 +463,14 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://vector:9001/health"
+          "http://vector:9001/health",
         ]
       timeout: 5s
       interval: 5s
       retries: 3
     environment:
       LOGFLARE_PUBLIC_ACCESS_TOKEN: ${SUPABASE_LOGFLARE_PUBLIC_ACCESS_TOKEN}
-    command:
-      [
-        "--config",
-        "/etc/vector/vector.yml"
-      ]
+    command: ["--config", "/etc/vector/vector.yml"]
     security_opt:
       - "label=disable"
 
@@ -516,8 +481,8 @@ services:
     image: supabase/supavisor:2.7.4
     restart: unless-stopped
     ports:
-      - ${POSTGRES_PORT}:5432
-      - ${POOLER_PROXY_PORT_TRANSACTION}:6543
+      - ${SUPABASE_POSTGRES_PORT:-5432}:5432
+      - ${SUPABASE_POOLER_PROXY_PORT_TRANSACTION:-6543}:6543
     volumes:
       - ./volumes/pooler/pooler.exs:/etc/pooler/pooler.exs:ro,z
     healthcheck:
@@ -529,7 +494,7 @@ services:
           "--head",
           "-o",
           "/dev/null",
-          "http://127.0.0.1:4000/api/health"
+          "http://127.0.0.1:4000/api/health",
         ]
       interval: 10s
       timeout: 5s
@@ -561,7 +526,7 @@ services:
       [
         "/bin/sh",
         "-c",
-        "/app/bin/migrate && /app/bin/supavisor eval \"$$(cat /etc/pooler/pooler.exs)\" && /app/bin/server"
+        '/app/bin/migrate && /app/bin/supavisor eval "$$(cat /etc/pooler/pooler.exs)" && /app/bin/server',
       ]
 
 volumes:
