@@ -3,8 +3,7 @@
 ########################
 include:
   - path:
-      - ./dependency/supabase/docker/docker-compose.yml
-      - ./dependency/supabase/docker/docker-compose.override.yml
+      - ./docker-compose.supabase.yml
 
 ########################
 # NETWORKS
@@ -142,13 +141,13 @@ services:
     image: atendai/evolution-api:v2.2.3
     container_name: evolution-api
     ports:
-      - "${EVOLUTION_PORT:-8585}:8585"
+      - "${EVOLUTION_PORT:-8585}:8080"
     volumes:
       - evolution-data:/lab_evolution/instances
     environment:
       SERVER_URL: http://localhost:${EVOLUTION_PORT:-8585}
+      SERVER_PORT: 8080
       AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
-
       DATABASE_ENABLED: "true"
       DATABASE_PROVIDER: postgresql
       DATABASE_CONNECTION_URI: >-
